@@ -47,31 +47,6 @@ DWORD GetFirstActiveUserSession() {
     return sessionId;
 }
 
-BOOL IsUserAdmin(HANDLE hToken) {
-    BOOL isAdmin = FALSE;
-    DWORD dwSize = 0;
-    PTOKEN_GROUPS pGroupInfo = nullptr;
-
-    if (!GetTokenInformation(hToken, TokenGroups, nullptr, 0, &dwSize) && GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-        pGroupInfo = (PTOKEN_GROUPS)GlobalAlloc(GPTR, dwSize);
-        if (pGroupInfo && GetTokenInformation(hToken, TokenGroups, pGroupInfo, dwSize, &dwSize)) {
-            SID_IDENTIFIER_AUTHORITY NtAuthority = SECURITY_NT_AUTHORITY;
-            PSID AdministratorsGroup = nullptr;
-            if (AllocateAndInitializeSid(&NtAuthority, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &AdministratorsGroup)) {
-                for (DWORD i = 0; i < pGroupInfo->GroupCount; i++) {
-                    if (EqualSid(AdministratorsGroup, pGroupInfo->Groups[i].Sid)) {
-                        isAdmin = TRUE;
-                        break;
-                    }
-                }
-                FreeSid(AdministratorsGroup);
-            }
-        }
-        GlobalFree(pGroupInfo);
-    }
-    return isAdmin;
-}
-
 HANDLE GetElevatedToken(HANDLE hToken) {
     HANDLE hElevatedToken = nullptr;
     TOKEN_LINKED_TOKEN linkedToken = { 0 };
@@ -80,15 +55,10 @@ HANDLE GetElevatedToken(HANDLE hToken) {
     if (GetTokenInformation(hToken, TokenLinkedToken, &linkedToken, sizeof(linkedToken), &dwSize)) {
         hElevatedToken = linkedToken.LinkedToken;
     }
-    else if (GetLastError() == ERROR_NO_TOKEN) {
-        if (IsUserAdmin(hToken)) {
-            DuplicateTokenEx(hToken, MAXIMUM_ALLOWED, nullptr, SecurityIdentification, TokenPrimary, &hElevatedToken);
-        }
-    }
     return hElevatedToken;
 }
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     DWORD currentSessionId;
     if (!ProcessIdToSessionId(GetCurrentProcessId(), &currentSessionId)) {
         MessageBoxW(NULL, L"Failed to get current session ID.", L"Error", MB_ICONERROR);

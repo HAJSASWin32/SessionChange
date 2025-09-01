@@ -1,8 +1,6 @@
 ﻿Add-Type -TypeDefinition @"
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.Principal;
 
 public class WinAPI {
     [DllImport("kernel32.dll")]
@@ -11,61 +9,48 @@ public class WinAPI {
     [DllImport("kernel32.dll")]
     public static extern bool ProcessIdToSessionId(uint dwProcessId, out uint pSessionId);
 
-    [DllImport("advapi32.dll", SetLastError=true)]
-	public static extern bool OpenProcessToken(IntPtr ProcessHandle, int DesiredAccess, ref IntPtr TokenHandle);
-
-    [DllImport("advapi32.dll", SetLastError=true)]
-	public static extern bool LookupPrivilegeValue(string lpSystemName,string lpName,ref long lpLuid);
-			
-    [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool AdjustTokenPrivileges(IntPtr TokenHandle,bool DisableAllPrivileges,ref TokPriv1Luid NewState,int BufferLength,IntPtr PreviousState, IntPtr ReturnLength);
-
     [DllImport("wtsapi32.dll", SetLastError = true)]
     public static extern bool WTSQueryUserToken(uint SessionId, out IntPtr phToken);
 
     [DllImport("wtsapi32.dll")]
-    public static extern bool WTSEnumerateSessionsW(IntPtr hServer, int Reserved, int Version, ref IntPtr ppSessionInfo, ref int pCount);
+    public static extern int WTSEnumerateSessions(
+        System.IntPtr hServer,
+        int Reserved,
+        int Version,
+        ref System.IntPtr ppSessionInfo,
+        ref int pCount);
 
     [DllImport("wtsapi32.dll")]
     public static extern void WTSFreeMemory(IntPtr pMemory);
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    public static extern bool CreateProcessAsUserW(IntPtr hToken, string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
+    public static extern bool CreateProcessAsUser(
+        IntPtr hToken,
+        string lpApplicationName,
+        string lpCommandLine,
+        ref SECURITY_ATTRIBUTES lpProcessAttributes,
+        ref SECURITY_ATTRIBUTES lpThreadAttributes,
+        bool bInheritHandles,
+        uint dwCreationFlags,
+        IntPtr lpEnvironment,
+        string lpCurrentDirectory,
+        ref STARTUPINFO lpStartupInfo,
+        out PROCESS_INFORMATION lpProcessInformation);
 
     [DllImport("kernel32.dll")]
     public static extern IntPtr GetCurrentProcess();
 
     [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool GetTokenInformation(IntPtr TokenHandle, uint TokenInformationClass, IntPtr TokenInformation, uint TokenInformationLength, out uint ReturnLength);
-
-    [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool DuplicateTokenEx(IntPtr hExistingToken, uint dwDesiredAccess, IntPtr lpTokenAttributes, int ImpersonationLevel, int TokenType, out IntPtr phNewToken);
-
-    [DllImport("advapi32.dll", SetLastError = true)]
-    public static extern bool AllocateAndInitializeSid(ref SID_IDENTIFIER_AUTHORITY pIdentifierAuthority, byte nSubAuthorityCount, uint dwSubAuthority0, uint dwSubAuthority1, uint dwSubAuthority2, uint dwSubAuthority3, uint dwSubAuthority4, uint dwSubAuthority5, uint dwSubAuthority6, uint dwSubAuthority7, out IntPtr pSid);
-
-    [DllImport("advapi32.dll")]
-    public static extern bool EqualSid(IntPtr pSid1, IntPtr pSid2);
-
-    [DllImport("advapi32.dll")]
-    public static extern void FreeSid(IntPtr pSid);
-
-    [DllImport("kernel32.dll")]
-    public static extern IntPtr GlobalAlloc(uint uFlags, uint dwBytes);
-
-    [DllImport("kernel32.dll")]
-    public static extern IntPtr GlobalFree(IntPtr hMem);
+    public static extern bool GetTokenInformation(
+        IntPtr TokenHandle,
+        TOKEN_INFORMATION_CLASS TokenInformationClass,
+        IntPtr TokenInformation,
+        uint TokenInformationLength,
+        out uint ReturnLength);
 
     [DllImport("kernel32.dll", SetLastError=true)]
     public static extern bool CloseHandle(IntPtr hObject);
-    
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public struct TOKEN_PRIVILAGES
-    {
-        public int Count;
-        public long Luid;
-        public int Attr;
-    }
+
 
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -106,50 +91,75 @@ public class WinAPI {
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct SID_IDENTIFIER_AUTHORITY {
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
-        public byte[] Value;
+    public struct SECURITY_ATTRIBUTES
+    {
+        public int nLength;
+        public IntPtr lpSecurityDescriptor;
+        public int bInheritHandle;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    public struct TOKEN_GROUPS {
-        public uint GroupCount;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
-        public SID_AND_ATTRIBUTES[] Groups;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct SID_AND_ATTRIBUTES {
-        public IntPtr Sid;
-        public uint Attributes;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
     public struct TOKEN_LINKED_TOKEN {
         public IntPtr LinkedToken;
     }
 
-    public const uint TOKEN_QUERY = 0x0008;
-    public const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
-    public const uint TOKEN_DUPLICATE = 0x0002;
-    public const uint TOKEN_ASSIGN_PRIMARY = 0x0001;
-    public const uint TOKEN_READ = 0x00020000;
-    public const uint SE_PRIVILEGE_ENABLED = 0x00000002;
-    public const uint CREATE_UNICODE_ENVIRONMENT = 0x00000400;
-    public const uint NORMAL_PRIORITY_CLASS = 0x00000020;
+    public enum TOKEN_INFORMATION_CLASS
+    {
+        [MarshalAs(UnmanagedType.LPStr)] TokenUser = 1,
+        TokenGroups,
+        TokenPrivileges,
+        TokenOwner,
+        TokenPrimaryGroup,
+        TokenDefaultDacl,
+        TokenSource,
+        TokenType,
+        TokenImpersonationLevel,
+        TokenStatistics,
+        TokenRestrictedSids,
+        TokenSessionId,
+        TokenGroupsAndPrivileges,
+        TokenSessionReference,
+        TokenSandBoxInert,
+        TokenAuditPolicy,
+        TokenOrigin,
+        TokenElevationType,
+        TokenLinkedToken,
+        TokenElevation,
+        TokenHasRestrictions,
+        TokenAccessInformation,
+        TokenVirtualizationAllowed,
+        TokenVirtualizationEnabled,
+        TokenIntegrityLevel,
+        TokenUIAccess,
+        TokenMandatoryPolicy,
+        TokenLogonSid,
+        TokenIsAppContainer,
+        TokenCapabilities,
+        TokenAppContainerSid,
+        TokenAppContainerNumber,
+        TokenUserClaimAttributes,
+        TokenDeviceClaimAttributes,
+        TokenRestrictedUserClaimAttributes,
+        TokenRestrictedDeviceClaimAttributes,
+        TokenDeviceGroups,
+        TokenRestrictedDeviceGroups,
+        TokenSecurityAttributes,
+        TokenIsRestricted,
+        TokenProcessTrustLevel,
+        TokenPrivateNameSpace,
+        TokenSingletonAttributes,
+        TokenBnoIsolation,
+        TokenChildProcessFlags,
+        TokenIsLessPrivilegedAppContainer,
+        TokenIsSandboxed,
+        TokenIsAppSilo,
+        TokenLoggingInformation,
+        TokenLearningMode,
+        MaxTokenInfoClass
+    }
+
     public const int WTS_CURRENT_SERVER_HANDLE = 0;
     public const int WTSActive = 0;
-    public const uint TokenGroups = 2;
-    public const uint TokenLinkedToken = 19;
-    public const int SecurityImpersonation = 2;
-    public const int SecurityIdentification = 1;
-    public const int TokenPrimary = 1;
-    public const uint ERROR_NO_TOKEN = 1008;
-    public const uint SECURITY_BUILTIN_DOMAIN_RID = 0x00000020;
-    public const uint ERROR_INSUFFICIENT_BUFFER = 122;
-    public const uint DOMAIN_ALIAS_RID_ADMINS = 0x00000220;
-    public const uint MAXIMUM_ALLOWED = 0x02000000;
-    public const uint GPTR = 0x0040;
 }
 "@
 
@@ -256,7 +266,7 @@ function Get-FirstActiveUserSession {
     $ppSessionInfo = [IntPtr]::Zero
     $pCount = 0
 
-    if([WinAPI]::WTSEnumerateSessionsW([WinAPI]::WTS_CURRENT_SERVER_HANDLE, 0, 1, [ref]$ppSessionInfo, [ref]$pCount)) {
+    if([WinAPI]::WTSEnumerateSessions([WinAPI]::WTS_CURRENT_SERVER_HANDLE, 0, 1, [ref]$ppSessionInfo, [ref]$pCount)) {
         $size = [Runtime.InteropServices.Marshal]::SizeOf([Type][WinAPI+WTS_SESSION_INFO])
         for($i = 0; $i -lt $pCount; $i++) {
             $pSession = [IntPtr]($ppSessionInfo.ToInt64() + $i * $size)
@@ -278,76 +288,30 @@ function Get-ElevatedToken {
     )
     
     $hElevatedToken = [IntPtr]::Zero
-    $dwSize = 0
+    $tokenInformationClass = [WinAPI+TOKEN_INFORMATION_CLASS]::TokenLinkedToken
     
-    # First call to get the required buffer size
-    $result = [WinAPI]::GetTokenInformation($huToken, [WinAPI]::TokenLinkedToken, [IntPtr]::Zero, 0, [ref]$dwSize)
+    # Get the required buffer size first
+    $returnLength = 0
+    $result = [WinAPI]::GetTokenInformation($huToken, $tokenInformationClass, [IntPtr]::Zero, 0, [ref]$returnLength)
     $lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
     
-    Write-ToFile "First GetTokenInformation call - Required size: $dwSize, Last error: $lastError"
-    
-    if ($lastError -eq [WinAPI]::ERROR_INSUFFICIENT_BUFFER) {
-        # Allocate the correct buffer size
-        $buffer = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($dwSize)
-        
+    if ($lastError -eq 122) { # ERROR_INSUFFICIENT_BUFFER
+        # Allocate buffer with the correct size
+        $buffer = [Runtime.InteropServices.Marshal]::AllocHGlobal($returnLength)
         try {
-            if ([WinAPI]::GetTokenInformation($huToken, [WinAPI]::TokenLinkedToken, $buffer, $dwSize, [ref]$dwSize)) {
-                $linkedToken = [System.Runtime.InteropServices.Marshal]::PtrToStructure($buffer, [Type][WinAPI+TOKEN_LINKED_TOKEN])
+            $result = [WinAPI]::GetTokenInformation($huToken, $tokenInformationClass, $buffer, $returnLength, [ref]$returnLength)
+            if ($result) {
+                $linkedToken = [Runtime.InteropServices.Marshal]::PtrToStructure($buffer, [Type][WinAPI+TOKEN_LINKED_TOKEN])
                 $hElevatedToken = $linkedToken.LinkedToken
-                Write-ToFile "Got elevated token via linked token: $hElevatedToken"
-                
-                # If we got a linked token, duplicate it to ensure we have the right permissions
-                $hDuplicatedToken = [IntPtr]::Zero
-                if ([WinAPI]::DuplicateTokenEx($hElevatedToken, [WinAPI]::MAXIMUM_ALLOWED, [IntPtr]::Zero, 
-                                              [WinAPI]::SecurityIdentification, [WinAPI]::TokenPrimary, 
-                                              [ref]$hDuplicatedToken)) {
-                    [WinAPI]::CloseHandle($hElevatedToken)
-                    $hElevatedToken = $hDuplicatedToken
-                    Write-ToFile "Duplicated linked token: $hElevatedToken"
-                }
             } else {
                 $lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                Write-ToFile "GetTokenInformation failed after buffer allocation: $lastError"
+                Write-ToFile "GetTokenInformation failed with error: $lastError"
             }
+        } finally {
+            [Runtime.InteropServices.Marshal]::FreeHGlobal($buffer)
         }
-        finally {
-            [System.Runtime.InteropServices.Marshal]::FreeHGlobal($buffer)
-        }
-    }
-    elseif ($lastError -eq [WinAPI]::ERROR_NO_TOKEN) {
-        Write-ToFile "No linked token, checking admin group membership."
-        if (Check-Admin -hcToken $huToken) {
-            Write-ToFile "User is admin, duplicating token."
-            $dupResult = [WinAPI]::DuplicateTokenEx($huToken, [WinAPI]::MAXIMUM_ALLOWED, [IntPtr]::Zero, 
-                                                   [WinAPI]::SecurityIdentification, [WinAPI]::TokenPrimary, 
-                                                   [ref]$hElevatedToken)
-            if (-not $dupResult) {
-                $lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                Write-ToFile "DuplicateTokenEx failed: $lastError"
-            } else {
-                Write-ToFile "DuplicateTokenEx succeeded, token: $hElevatedToken"
-            }
-        } else {
-            Write-ToFile "User is not admin."
-        }
-    }
-    else {
-        Write-ToFile "GetTokenInformation for TokenLinkedToken failed: $lastError"
-        
-        # Fallback: Check if user is admin and try to duplicate the token
-        Write-ToFile "Trying fallback method (admin check)"
-        if (Check-Admin -hcToken $huToken) {
-            Write-ToFile "User is admin, duplicating token (fallback)."
-            $dupResult = [WinAPI]::DuplicateTokenEx($huToken, [رهWinAPI]::MAXIMUM_ALLOWED, [IntPtr]::Zero, 
-                                                   [WinAPI]::SecurityIdentification, [WinAPI]::TokenPrimary, 
-                                                   [ref]$hElevatedToken)
-            if (-not $dupResult) {
-                $lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-                Write-ToFile "DuplicateTokenEx failed (fallback): $lastError"
-            } else {
-                Write-ToFile "DuplicateTokenEx succeeded (fallback), token: $hElevatedToken"
-            }
-        }
+    } else {
+        Write-ToFile "Failed to get buffer size. Error: $lastError"
     }
     
     return $hElevatedToken
@@ -384,16 +348,16 @@ if($currentSessionId -eq 0)
         exit 1
     }
 
-    $hElevatedToken = Get-ElevatedToken -huToken $hUserToken
-    [WinAPI]::CloseHandle($hUserToken)
-    Write-ToFile "Elevated token is: $hElevatedToken.`n"
+    # $hElevatedToken = Get-ElevatedToken -huToken $hUserToken
+    # [WinAPI]::CloseHandle($hUserToken)
+    # Write-ToFile "Elevated token is: $hElevatedToken.`n"
     
 
-    if(-not $hElevatedToken)
-    {
-        Write-ToFile "Failed to get elevated token.`n"
-        exit 1
-    }
+    # if(-not $hElevatedToken)
+    # {
+    #     Write-ToFile "Failed to get elevated token.`n"
+    #     exit 1
+    # }
 
     $scriptPath = $MyInvocation.MyCommand.Definition
     $powershellPath = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -404,7 +368,7 @@ if($currentSessionId -eq 0)
 
     $processInfo = New-Object WinAPI+PROCESS_INFORMATION
     
-    if([WinAPI]::CreateProcessAsUserW($hElevatedToken, $powershellPath, "-File `"$scriptPath`"", [IntPtr]::Zero, [IntPtr]::Zero, $false, 0, [IntPtr]::Zero, $null, [ref]$startupInfo, [ref]$processInfo))
+    if([WinAPI]::CreateProcessAsUserW($hUserToken, $powershellPath, "-File `"$scriptPath`"", [IntPtr]::Zero, [IntPtr]::Zero, $false, 0, [IntPtr]::Zero, $null, [ref]$startupInfo, [ref]$processInfo))
     {
         [WinAPI]::CloseHandle($processInfo.hProcess)
         [WinAPI]::CloseHandle($processInfo.hThread)
