@@ -1,6 +1,4 @@
-﻿# Compile the C# code
-$csharpCode = @"
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -10,7 +8,7 @@ namespace ElevatedSessionLauncher
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             uint currentSessionId;
             if (!ProcessIdToSessionId((uint)Process.GetCurrentProcess().Id, out currentSessionId))
@@ -56,18 +54,8 @@ namespace ElevatedSessionLauncher
                     return;
                 }
 
-                // Use PowerShell.exe instead of current module
-                string modulePath = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
-                string arguments = "-Command Start-Process calc.exe";
-                
-                // If arguments were passed to the program, use them
-                if (args.Length > 0)
-                {
-                    arguments = string.Join(" ", args);
-                }
-
+                string modulePath = Process.GetCurrentProcess().MainModule.FileName;
                 WriteLog($"Module path: {modulePath}");
-                WriteLog($"Arguments: {arguments}");
 
                 STARTUPINFO si = new STARTUPINFO();
                 si.cb = Marshal.SizeOf(si);
@@ -78,7 +66,7 @@ namespace ElevatedSessionLauncher
                 if (CreateProcessAsUser(
                     hElevatedToken,
                     modulePath,
-                    arguments,
+                    null,
                     IntPtr.Zero,
                     IntPtr.Zero,
                     false,
@@ -375,11 +363,3 @@ namespace ElevatedSessionLauncher
         }
     }
 }
-"@
-
-# Compile the C# code
-Add-Type -TypeDefinition $csharpCode -Language CSharp
-
-# Run the compiled code with your desired PowerShell command
-# The argument will be passed to the C# program and used as the PowerShell command
-[ElevatedSessionLauncher.Program]::Main(@("-Command", "Start-Process calc.exe"))
